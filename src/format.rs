@@ -94,6 +94,12 @@ pub fn format_content(content: &str) -> Result<String, Box<dyn Error>> {
         result.push_str(&format_chunk(chunk, &mut state)?);
     }
 
+    if let ParseState::CheckingHeader{source_header, ..} = state {
+        result.push_str(&format!("{}\n", source_header));
+    } else if let ParseState::ReadingTable{table, ..} = state {
+        table.write_output(&mut result);
+    }
+
     Ok(result)
 }
 
@@ -151,6 +157,7 @@ fn process_header(line: &str, output: &mut String, source_header: &str, headers:
     for (header, raw_sub) in headers.iter().zip(sub_headers) {
         let sub = raw_sub.trim();
         if sub.len() < 3 {
+            output.push_str(&format!("{}\n", source_header));
             return Ok(ParseState::RegularText);
         }
         let align_left = sub.starts_with(':');
@@ -165,6 +172,7 @@ fn process_header(line: &str, output: &mut String, source_header: &str, headers:
         }
         for c in dashes.chars() {
             if c != '-' {
+                output.push_str(&format!("{}\n", source_header));
                 return Ok(ParseState::RegularText);
             }
         }
@@ -198,7 +206,10 @@ fn process_table(line: &str, output: &mut String, source_table: &[String], table
 
     let columns = clean[1..].split_terminator('|').map(|header| header.trim().to_string()).collect::<Vec<_>>();
     if columns.len() != table.columns.len() {
-        table.write_output(output);
+        // We consider that this is a broken table, not the end of a valid table, so we output the original text
+        for line in source_table {
+            output.push_str(&format!("{}\n", line));
+        }
         return Ok(ParseState::RegularText);
     }
 
