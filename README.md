@@ -1,7 +1,7 @@
 # mdfmt
 
 Formats the tables in your Markdown documents.
-Usage: `mdfmt [--in-place] <input> [<output>]`
+Usage: `mdfmt [--in-place] [--strict] <input> [<output>]`
 
 Before:
 

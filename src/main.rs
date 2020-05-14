@@ -13,6 +13,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .short("i")
             .long("in-place")
             .help("Modify input file in place"))
+        .arg(Arg::with_name("strict")
+            .short("s")
+            .long("strict")
+            .help("Warn if an input file contains broken tables (instead of ignoring them)"))
         .arg(Arg::with_name("source")
             .help("The source file to format")
             .required(true)
@@ -22,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .index(2))
         .get_matches();
 
+    let strict = args.is_present("strict");
     let inplace = args.is_present("inplace");
     if inplace && args.is_present("destination") {
         println!("Cannot be both inplace and have a destination.");
@@ -31,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let filepath = args.value_of_os("source").unwrap();
     let content = read_to_string(filepath)?;
 
-    let formatted = format::format_content(&content)?;
+    let formatted = format::format_content(&content, strict)?;
 
     if inplace {
         let mut out_file = File::create(filepath)?;

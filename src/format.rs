@@ -79,7 +79,7 @@ impl Table {
     }
 }
 
-pub fn format_content(content: &str) -> Result<String, Box<dyn Error>> {
+pub fn format_content(content: &str, strict: bool) -> Result<String, Box<dyn Error>> {
     let mut result = String::new();
 
     let mut state = ParseState::new();
@@ -91,7 +91,7 @@ pub fn format_content(content: &str) -> Result<String, Box<dyn Error>> {
             continue
         }
 
-        result.push_str(&format_chunk(chunk, &mut state)?);
+        result.push_str(&format_chunk(chunk, &mut state, strict)?);
     }
 
     if let ParseState::CheckingHeader{source_header, ..} = state {
@@ -104,14 +104,14 @@ pub fn format_content(content: &str) -> Result<String, Box<dyn Error>> {
 }
 
 /// Returns the formatted chunk (may delay output if a table spans multiple chunks)
-fn format_chunk(chunk: &str, state: &mut ParseState) -> Result<String, Box<dyn Error>> {
+fn format_chunk(chunk: &str, state: &mut ParseState, strict: bool) -> Result<String, Box<dyn Error>> {
     let mut output = String::new();
 
     for line in chunk.lines() {
         *state = match state {
             ParseState::RegularText => process_regular_text(line)?,
             ParseState::CheckingHeader{source_header, headers} => process_header(line, &mut output, source_header, headers)?,
-            ParseState::ReadingTable{source_table, table} => process_table(line, &mut output, source_table, table)?,
+            ParseState::ReadingTable{source_table, table} => process_table(line, &mut output, source_table, table, strict)?,
         };
 
         if let ParseState::RegularText = state {
@@ -197,7 +197,7 @@ fn process_header(line: &str, output: &mut String, source_header: &str, headers:
     })
 }
 
-fn process_table(line: &str, output: &mut String, source_table: &[String], table: &Table) -> Result<ParseState, Box<dyn Error>> {
+fn process_table(line: &str, output: &mut String, source_table: &[String], table: &Table, strict: bool) -> Result<ParseState, Box<dyn Error>> {
     let clean = line.trim();
     if !clean.starts_with('|') || !clean.ends_with('|') {
         table.write_output(output);
@@ -207,6 +207,10 @@ fn process_table(line: &str, output: &mut String, source_table: &[String], table
     let columns = clean[1..].split_terminator('|').map(|header| header.trim().to_string()).collect::<Vec<_>>();
     if columns.len() != table.columns.len() {
         // We consider that this is a broken table, not the end of a valid table, so we output the original text
+        if strict {
+            let line_num = 1 + output.as_bytes().iter().filter(|&&c| c==b'\n').count();
+            eprintln!("The table at line {} appears broken, it will not be formatted\n", line_num);
+        }
         for line in source_table {
             output.push_str(&format!("{}\n", line));
         }
