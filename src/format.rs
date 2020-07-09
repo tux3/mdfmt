@@ -1,4 +1,5 @@
 use std::error::Error;
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone)]
 enum TableAlignment {
@@ -39,7 +40,7 @@ impl ParseState {
 impl Table {
     pub fn write_output(&self, output: &mut String) {
         let column_widths = self.columns.iter().map(|column| {
-           column.lines.iter().map(|l| l.len()).max().unwrap().max(1)
+           column.lines.iter().map(|l| l.width()).max().unwrap().max(1)
         }).collect::<Vec<_>>();
 
         let lines = self.columns[0].lines.len();
@@ -235,6 +236,6 @@ fn process_table(line: &str, output: &mut String, source_table: &[String], table
 
 fn pad_cell_content(elem: &str, width: usize) -> String {
     let mut padded = format!(" {}", elem.trim());
-    padded.push_str(&" ".repeat(width + 2 - padded.len()));
+    padded.push_str(&" ".repeat(width + 2 - padded.width()));
     padded
 }
